@@ -15,20 +15,22 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 
+import com.example.hjf.scrolllayout.TopToBottomFinishLayout;
+
 /**
  * @author heJianfeng
  * @date 2019-10-14
  */
-public class MyDialogFragment extends DialogFragment {
+public class TestDialogFragment extends DialogFragment {
 
     public void show(FragmentManager fragmentManager) {
         fragmentManager.beginTransaction()
-                .add(this, MyDialogFragment.class.getName())
+                .add(this, TestDialogFragment.class.getName())
                 .commitAllowingStateLoss();
     }
 
-    public static MyDialogFragment instance() {
-        return new MyDialogFragment();
+    public static TestDialogFragment instance() {
+        return new TestDialogFragment();
     }
 
     @NonNull
@@ -42,13 +44,33 @@ public class MyDialogFragment extends DialogFragment {
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.item, container);
-        RecyclerView mRecyclerView = view.findViewById(R.id.recyler_view);
+        RecyclerView mRecyclerView = view.findViewById(R.id.can_scroll_view);
         String[] items = getResources().getStringArray(R.array.tab_B);
+
         RecyclerViewAdapter adapter = new RecyclerViewAdapter(items);
         LinearLayoutManager layoutManager = new LinearLayoutManager(view.getContext());
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         mRecyclerView.setLayoutManager(layoutManager);
         mRecyclerView.setAdapter(adapter);
+
+        TopToBottomFinishLayout finishLayout = view.findViewById(R.id.top_to_bottom);
+        finishLayout.setOnFinishListener(new TopToBottomFinishLayout.OnFinishListener() {
+            @Override
+            public void onFinish() {
+                dismiss();
+            }
+        });
+        finishLayout.setSlidingPercentageListener(new TopToBottomFinishLayout.SlidingPercentageListener() {
+            @Override
+            public void onPercentage(float percentage) {
+                if (getDialog() != null && getDialog().getWindow() != null) {
+                    Window window = getDialog().getWindow();
+                    WindowManager.LayoutParams params = window.getAttributes();
+                    params.dimAmount = (1 - percentage) / 2;
+                    window.setAttributes(params);
+                }
+            }
+        });
         return view;
     }
 
@@ -64,5 +86,4 @@ public class MyDialogFragment extends DialogFragment {
             window.setAttributes(params);
         }
     }
-
 }

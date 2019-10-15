@@ -1,4 +1,4 @@
-package com.taohuahua.nestedviewdemo;
+package com.taohuahua.nestedviewdemo.scroll;
 import android.animation.Animator;
 import android.animation.ValueAnimator;
 import android.content.Context;
@@ -19,6 +19,8 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+
+import com.taohuahua.nestedviewdemo.R;
 
 import java.util.LinkedList;
 import java.util.List;

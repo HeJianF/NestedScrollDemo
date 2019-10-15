@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.taohuahua.nestedviewdemo.ParentScrollLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.example.hjf.scrolllayout.TopToBottomFinishLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/top_to_bottom"
     android:layout_width="match_parent"
     android:layout_height="400dp"
     android:orientation="vertical">
@@ -15,13 +16,13 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_gravity="center"
+            android:background="@color/colorPrimary"
             android:gravity="center"
             android:text="refreshing"
-            android:textColor="@color/colorAccent"
-            android:textSize="18dp" />
+            android:textSize="18sp" />
 
         <android.support.v7.widget.RecyclerView
-            android:id="@+id/recyler_view"
+            android:id="@+id/can_scroll_view"
             android:layout_width="match_parent"
             android:layout_height="350dp">
 
@@ -29,4 +30,4 @@
 
     </LinearLayout>
 
-</com.taohuahua.nestedviewdemo.ParentScrollLayout>
+</com.example.hjf.scrolllayout.TopToBottomFinishLayout>

@@ -1,4 +1,4 @@
-package com.taohuahua.nestedviewdemo;
+package com.taohuahua.nestedviewdemo.scroll;
 
 import android.content.Context;
 import android.support.annotation.NonNull;
@@ -8,10 +8,11 @@ import android.support.v4.view.NestedScrollingParentHelper;
 import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.Scroller;
+
+import com.taohuahua.nestedviewdemo.R;
 
 /**
  * @author heJianfeng
@@ -21,8 +22,17 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
 
     private NestedScrollingParentHelper parentHelper;
     private RecyclerView mRecyclerView;
+
     // Is Refreshing
     volatile private boolean mRefreshing = false;
+
+    private int mViewHeight;
+    private Scroller mScroller;
+    private DIRECTION mDirection;
+
+    enum DIRECTION {
+        UP, DOWN
+    }
 
     public ParentScrollLayout(Context context) {
         this(context, null);
@@ -35,20 +45,19 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
     public ParentScrollLayout(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         parentHelper = new NestedScrollingParentHelper(this);
-    }
-
-    @Override
-    public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (!isEnabled() || canChildScrollUp()) {
-            return false;
-        }
-        return super.onInterceptTouchEvent(ev);
+        mScroller = new Scroller(context);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
         mRecyclerView = findViewById(R.id.recyler_view);
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        mViewHeight = getHeight();
     }
 
     @Override
@@ -64,23 +73,79 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
     @Override
     public void onStopNestedScroll(@NonNull View target, int type) {
         parentHelper.onStopNestedScroll(target, type);
-        Log.d("ParentScrollLayout", "onStopNestedScroll: ");
-        if (isRefreshing()) {
-            return;
+        mRefreshing = false;
+        if (getScrollY() != 0) {
+            if (mDirection == DIRECTION.DOWN) {
+                //isFinish = true;
+                scrollBottom();
+            } else if (mDirection == DIRECTION.UP) {
+                //isFinish = false;
+                scrollOrigin();
+            }
         }
     }
 
     @Override
     public void onNestedScroll(@NonNull View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed, int type) {
-        Log.d("ParentScrollLayout", "onNestedScroll: " + dyConsumed + "   " + dyUnconsumed);
-        scrollBy(0, -dyConsumed);
     }
 
     @Override
     public void onNestedPreScroll(@NonNull View target, int dx, int dy, @Nullable int[] consumed, int type) {
-        //consumed[1] += dy;
-        Log.d("ParentScrollLayout", "onNestedPreScroll: " + dy);
+        if ((!canChildScrollUp() && dy < 0) || (dy > 0 && getScrollY() < 0)) {
+            consumed[1] += dy;
+            if (dy > 0 && (getScrollY() + dy) > 0) {
+                dy = Math.abs(getScrollY());
+            }
+            scrollBy(0, dy);
+            mRefreshing = true;
+        }
     }
+
+    @Override
+    public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
+        mDirection = velocityY < 0 ? DIRECTION.DOWN : DIRECTION.UP;
+        if (mDirection == DIRECTION.UP) {
+            scrollOrigin();
+        }
+        return !canChildScrollUp();
+    }
+
+    @Override
+    public boolean onNestedFling(View target, float velocityX, float velocityY, boolean consumed) {
+        return super.onNestedFling(target, velocityX, velocityY, consumed);
+    }
+
+    /**
+     * 滚动出屏幕
+     */
+    private void scrollBottom() {
+        int delta = mViewHeight + getScrollY();
+        mScroller.startScroll(0, getScrollY(), 0, -delta, 200);
+        invalidate();
+    }
+
+    private void scrollOrigin() {
+        mScroller.startScroll(0, getScrollY(), 0, -getScrollY(), 200);
+        invalidate();
+    }
+
+    @Override
+    public void computeScroll() {
+        if (mScroller.computeScrollOffset()) {
+            scrollTo(0, mScroller.getCurrY());
+            postInvalidate();
+            /*percentageNotify();
+            if (mScroller.isFinished() && isFinish) {
+                if (onFinishListener != null) {
+                    onFinishListener.onFinish();
+                } else {
+                    scrollOrigin();
+                    isFinish = false;
+                }
+            }*/
+        }
+    }
+
 
     /**
      * Whether child view can scroll up
@@ -104,10 +169,6 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
             return false;
         }
         return ViewCompat.canScrollVertically(mRecyclerView, 1);
-    }
-
-    public boolean isRefreshing() {
-        return mRefreshing;
     }
 
 }

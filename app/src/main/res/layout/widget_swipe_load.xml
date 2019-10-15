@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.taohuahua.nestedviewdemo.SwipeLoadLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<com.taohuahua.nestedviewdemo.scroll.SwipeLoadLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/swipe_load_layout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:layout_below="@id/button">
 
     <FrameLayout
         android:id="@+id/refresh_view"
@@ -12,19 +12,20 @@
 
         <TextView
             android:id="@+id/tv"
-            android:text="refreshing"
-            android:textSize="18dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:layout_gravity="center"
             android:gravity="center"
+            android:text="refreshing"
             android:textColor="@color/colorAccent"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
+            android:textSize="18sp" />
     </FrameLayout>
 
     <android.support.v7.widget.RecyclerView
         android:id="@+id/recyler_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
+
     </android.support.v7.widget.RecyclerView>
 
     <FrameLayout
@@ -35,13 +36,13 @@
 
         <TextView
             android:id="@+id/tv_2"
-            android:text="loading_more"
-            android:textSize="18dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
             android:layout_gravity="center"
             android:gravity="center"
+            android:text="loading_more"
             android:textColor="@color/colorAccent"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
+            android:textSize="18sp" />
     </FrameLayout>
 
-</com.taohuahua.nestedviewdemo.SwipeLoadLayout>
+</com.taohuahua.nestedviewdemo.scroll.SwipeLoadLayout>

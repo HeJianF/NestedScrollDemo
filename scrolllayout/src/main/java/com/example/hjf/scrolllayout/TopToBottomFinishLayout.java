@@ -1,21 +1,28 @@
-package com.taohuahua.nestedviewdemo;
+package com.example.hjf.scrolllayout;
 
 import android.content.Context;
+import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
+import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.RelativeLayout;
 import android.widget.Scroller;
 
 /**
- * 从上向下滚动的控件
+ * 从上向下滑动关闭的控件
+ * <p>
+ * 1.需要手动实现OnFinishListener接口来dismiss
+ * 2.在子控件中包含可滑动的View(RecycleView、ListView、NestedScrollView...)时，需要将id设置为can_scroll_view
+ * 3.可以选择实现SlidingPercentageListener接口来监听View滑动的比例（0.0-1.0）,可以用来设置背景透明度等
  *
  * @author heJianfeng
  * @date 2019-10-12
  */
 public class TopToBottomFinishLayout extends RelativeLayout {
 
+    private View scrollingView;
     private int mViewHeight;
     private float mLastY;
 
@@ -50,6 +57,12 @@ public class TopToBottomFinishLayout extends RelativeLayout {
     }
 
     @Override
+    protected void onFinishInflate() {
+        super.onFinishInflate();
+        scrollingView = findViewById(R.id.can_scroll_view);
+    }
+
+    @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         acquireVelocityTracker(ev);
         switch (ev.getAction()) {
@@ -72,7 +85,7 @@ public class TopToBottomFinishLayout extends RelativeLayout {
                 mLastY = y;
                 break;
             case MotionEvent.ACTION_MOVE:
-                if (slideValidity(mLastY - y)) {
+                if (slideValidity(mLastY - y) && mDirection == DIRECTION.DOWN && !canChildScrollUp()) {
                     return true;
                 }
                 break;
@@ -90,13 +103,15 @@ public class TopToBottomFinishLayout extends RelativeLayout {
                 if (slideValidity(dy)) {
                     isSliding = true;
                 }
-                if (isSliding && (getScrollY() < 0 || mDirection == DIRECTION.DOWN)) {
+                if (isSliding && !canChildScrollUp() && (getScrollY() < 0 || mDirection == DIRECTION.DOWN)) {
+                    //向下滚动的距离超过view的高度时，直接调用onFinish
                     if (Math.abs(getScrollY()) >= mViewHeight) {
                         if (onFinishListener != null) {
                             onFinishListener.onFinish();
                             return true;
                         }
                     }
+                    //防止View向上滚动
                     if (getScrollY() + dy > 0) {
                         dy = Math.abs(getScrollY());
                     }
@@ -119,7 +134,7 @@ public class TopToBottomFinishLayout extends RelativeLayout {
     }
 
     /**
-     * 滚动出屏幕
+     * 向下滚动出屏幕
      */
     private void scrollBottom() {
         int delta = mViewHeight + getScrollY();
@@ -142,6 +157,7 @@ public class TopToBottomFinishLayout extends RelativeLayout {
             postInvalidate();
             percentageNotify();
             if (mScroller.isFinished() && isFinish) {
+                //在向下滑动结束后，若用户没有实现onFinish方法，则View恢复原位
                 if (onFinishListener != null) {
                     onFinishListener.onFinish();
                 } else {
@@ -168,6 +184,30 @@ public class TopToBottomFinishLayout extends RelativeLayout {
             mVelocityTracker.recycle();
             mVelocityTracker = null;
         }
+    }
+
+    /**
+     * Whether child view can scroll up
+     *
+     * @return
+     */
+    private boolean canChildScrollUp() {
+        if (scrollingView == null) {
+            return false;
+        }
+        return ViewCompat.canScrollVertically(scrollingView, -1);
+    }
+
+    /**
+     * Whether child view can scroll down
+     *
+     * @return
+     */
+    private boolean canChildScrollDown() {
+        if (scrollingView == null) {
+            return false;
+        }
+        return ViewCompat.canScrollVertically(scrollingView, 1);
     }
 
     /**

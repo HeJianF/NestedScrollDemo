@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.view.View;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -17,8 +18,11 @@ public class MainActivity extends AppCompatActivity {
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         mRecyclerView.setLayoutManager(layoutManager);
-
         mRecyclerView.setAdapter(adapter);
-        MyDialogFragment.instance().show(getSupportFragmentManager());
     }
+
+    public void onClick(View view) {
+        TestDialogFragment.instance().show(getSupportFragmentManager());
+    }
+
 }
