@@ -1,12 +1,15 @@
-package com.example.hjf.scrolllayout;
+package com.taohuahua.nestedviewdemo.scroll;
 
 import android.content.Context;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.view.NestedScrollingParent2;
+import android.support.v4.view.NestedScrollingParentHelper;
 import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.widget.RelativeLayout;
 import android.widget.Scroller;
 
@@ -14,26 +17,25 @@ import android.widget.Scroller;
  * 从上向下滑动关闭的控件
  * <p>
  * 1.需要手动实现OnFinishListener接口来dismiss
- * 2.在子控件中包含可滑动的View(RecycleView、ListView、NestedScrollView...)时，需要将id设置为can_scroll_view
- * 3.可以选择实现SlidingPercentageListener接口来监听View滑动的比例（0.0-1.0）,可以用来设置背景透明度等
+ * 2.可以选择实现SlidingPercentageListener接口来监听View滑动的比例（0.0-1.0）,可以用来设置背景透明度等
+ * 3.在子控件中包含可滑动的View(RecycleView、ListView、NestedScrollView...)
  *
  * @author heJianfeng
  * @date 2019-10-12
  */
-public class TopToBottomFinishLayout extends RelativeLayout {
+public class TopToBottomFinishLayout extends RelativeLayout implements NestedScrollingParent2 {
 
-    private View scrollingView;
     private int mViewHeight;
     private float mLastY;
-
-    private boolean isSliding;
+    private boolean isScrolling;
     private boolean isFinish;
     private OnFinishListener onFinishListener;
     private SlidingPercentageListener slidingPercentageListener;
 
-    private int mTouchSlop;
+    private NestedScrollingParentHelper parentHelper;
     private Scroller mScroller;
     private VelocityTracker mVelocityTracker;
+    private boolean isTouch;
     private DIRECTION mDirection;
 
     enum DIRECTION {
@@ -46,31 +48,66 @@ public class TopToBottomFinishLayout extends RelativeLayout {
 
     public TopToBottomFinishLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        parentHelper = new NestedScrollingParentHelper(this);
         mScroller = new Scroller(context);
     }
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
-        mViewHeight = this.getHeight();
+        mViewHeight = getHeight();
     }
 
     @Override
-    protected void onFinishInflate() {
-        super.onFinishInflate();
-        scrollingView = findViewById(R.id.can_scroll_view);
+    public boolean onStartNestedScroll(@NonNull View child, @NonNull View target, int axes, int type) {
+        return (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
+    }
+
+    @Override
+    public void onNestedScrollAccepted(@NonNull View child, @NonNull View target, int axes, int type) {
+        parentHelper.onNestedScrollAccepted(child, target, axes, type);
+    }
+
+    @Override
+    public void onStopNestedScroll(@NonNull View target, int type) {
+        parentHelper.onStopNestedScroll(target, type);
+        scrollStop();
+    }
+
+    @Override
+    public void onNestedPreScroll(@NonNull View target, int dx, int dy, @Nullable int[] consumed, int type) {
+        if (notChildScrollUp(target) || (dy > 0 && getScrollY() < 0)) {
+            if (dy > 0 && (getScrollY() + dy) > 0) {
+                dy = Math.abs(getScrollY());
+            }
+            if (consumed != null) {
+                consumed[1] += dy;
+                startScroll(dy);
+            }
+        }
+    }
+
+    @Override
+    public void onNestedScroll(@NonNull View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed, int type) {
+    }
+
+    @Override
+    public boolean onNestedPreFling(@NonNull View target, float velocityX, float velocityY) {
+        return notChildScrollUp(target);
     }
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         acquireVelocityTracker(ev);
         switch (ev.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                isTouch = true;
             case MotionEvent.ACTION_MOVE:
                 mVelocityTracker.computeCurrentVelocity(1000);
                 mDirection = mVelocityTracker.getYVelocity() < 0 ? DIRECTION.UP : DIRECTION.DOWN;
                 break;
             case MotionEvent.ACTION_UP:
+                isTouch = false;
                 recycleVelocityTracker();
                 break;
         }
@@ -78,33 +115,20 @@ public class TopToBottomFinishLayout extends RelativeLayout {
     }
 
     @Override
-    public boolean onInterceptTouchEvent(MotionEvent ev) {
+    public boolean onTouchEvent(MotionEvent ev) {
         float y = ev.getY();
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 mLastY = y;
                 break;
             case MotionEvent.ACTION_MOVE:
-                if (slideValidity(mLastY - y) && mDirection == DIRECTION.DOWN && !canChildScrollUp()) {
-                    return true;
-                }
-                break;
-        }
-        return super.onInterceptTouchEvent(ev);
-    }
-
-    @Override
-    public boolean onTouchEvent(MotionEvent ev) {
-        float y = ev.getY();
-        switch (ev.getAction()) {
-            case MotionEvent.ACTION_MOVE:
                 float dy = mLastY - y;
                 mLastY = y;
                 if (slideValidity(dy)) {
-                    isSliding = true;
+                    isScrolling = true;
                 }
-                if (isSliding && !canChildScrollUp() && (getScrollY() < 0 || mDirection == DIRECTION.DOWN)) {
-                    //向下滚动的距离超过view的高度时，直接调用onFinish
+                if (isScrolling && (mDirection == DIRECTION.DOWN || getScrollY() < 0)) {
+                    //向下滚动的距离超过view的高度时，直接调用onFinish1
                     if (Math.abs(getScrollY()) >= mViewHeight) {
                         if (onFinishListener != null) {
                             onFinishListener.onFinish();
@@ -112,25 +136,36 @@ public class TopToBottomFinishLayout extends RelativeLayout {
                         }
                     }
                     //防止View向上滚动
-                    if (getScrollY() + dy > 0) {
+                    if (mDirection == DIRECTION.UP && getScrollY() + dy > 0) {
                         dy = Math.abs(getScrollY());
                     }
-                    scrollBy(0, (int) dy);
-                    percentageNotify();
+                    startScroll((int) dy);
                 }
                 break;
             case MotionEvent.ACTION_UP:
-                isSliding = false;
-                if (mDirection == DIRECTION.DOWN) {
-                    isFinish = true;
-                    scrollBottom();
-                } else if (mDirection == DIRECTION.UP) {
-                    isFinish = false;
-                    scrollOrigin();
-                }
+                scrollStop();
                 break;
         }
         return true;
+    }
+
+    private void startScroll(int dy) {
+        isScrolling = true;
+        scrollBy(0, dy);
+        percentageNotify();
+    }
+
+    private void scrollStop() {
+        if (isScrolling) {
+            if (mDirection == DIRECTION.DOWN) {
+                isFinish = true;
+                scrollBottom();
+            } else if (mDirection == DIRECTION.UP) {
+                isFinish = false;
+                scrollOrigin();
+            }
+            isScrolling = false;
+        }
     }
 
     /**
@@ -169,7 +204,7 @@ public class TopToBottomFinishLayout extends RelativeLayout {
     }
 
     private boolean slideValidity(float dy) {
-        return Math.abs(dy) > mTouchSlop;
+        return Math.abs(dy) > 3;
     }
 
     private void acquireVelocityTracker(final MotionEvent event) {
@@ -186,28 +221,8 @@ public class TopToBottomFinishLayout extends RelativeLayout {
         }
     }
 
-    /**
-     * Whether child view can scroll up
-     *
-     * @return
-     */
-    private boolean canChildScrollUp() {
-        if (scrollingView == null) {
-            return false;
-        }
-        return ViewCompat.canScrollVertically(scrollingView, -1);
-    }
-
-    /**
-     * Whether child view can scroll down
-     *
-     * @return
-     */
-    private boolean canChildScrollDown() {
-        if (scrollingView == null) {
-            return false;
-        }
-        return ViewCompat.canScrollVertically(scrollingView, 1);
+    public boolean notChildScrollUp(View view) {
+        return !ViewCompat.canScrollVertically(view, -1);
     }
 
     /**

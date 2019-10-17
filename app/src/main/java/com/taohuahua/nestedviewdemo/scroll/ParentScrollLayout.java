@@ -6,13 +6,12 @@ import android.support.annotation.Nullable;
 import android.support.v4.view.NestedScrollingParent2;
 import android.support.v4.view.NestedScrollingParentHelper;
 import android.support.v4.view.ViewCompat;
-import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.Scroller;
-
-import com.taohuahua.nestedviewdemo.R;
 
 /**
  * @author heJianfeng
@@ -21,12 +20,10 @@ import com.taohuahua.nestedviewdemo.R;
 public class ParentScrollLayout extends LinearLayout implements NestedScrollingParent2 {
 
     private NestedScrollingParentHelper parentHelper;
-    private RecyclerView mRecyclerView;
 
-    // Is Refreshing
-    volatile private boolean mRefreshing = false;
-
+    private boolean isTouch;
     private int mViewHeight;
+    private VelocityTracker mVelocityTracker;
     private Scroller mScroller;
     private DIRECTION mDirection;
 
@@ -51,7 +48,6 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        mRecyclerView = findViewById(R.id.recyler_view);
     }
 
     @Override
@@ -62,7 +58,7 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
 
     @Override
     public boolean onStartNestedScroll(@NonNull View child, @NonNull View target, int axes, int type) {
-        return isEnabled() && (!canChildScrollUp()) && !mRefreshing;
+        return (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
     }
 
     @Override
@@ -73,13 +69,10 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
     @Override
     public void onStopNestedScroll(@NonNull View target, int type) {
         parentHelper.onStopNestedScroll(target, type);
-        mRefreshing = false;
         if (getScrollY() != 0) {
             if (mDirection == DIRECTION.DOWN) {
-                //isFinish = true;
                 scrollBottom();
             } else if (mDirection == DIRECTION.UP) {
-                //isFinish = false;
                 scrollOrigin();
             }
         }
@@ -91,28 +84,39 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
 
     @Override
     public void onNestedPreScroll(@NonNull View target, int dx, int dy, @Nullable int[] consumed, int type) {
-        if ((!canChildScrollUp() && dy < 0) || (dy > 0 && getScrollY() < 0)) {
-            consumed[1] += dy;
+        if (!canChildScrollUp(target) || (dy > 0 && getScrollY() < 0)) {
             if (dy > 0 && (getScrollY() + dy) > 0) {
                 dy = Math.abs(getScrollY());
             }
-            scrollBy(0, dy);
-            mRefreshing = true;
+            consumed[1] += dy;
+            if (isTouch) {
+                scrollBy(0, dy);
+            }
         }
     }
 
     @Override
-    public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
-        mDirection = velocityY < 0 ? DIRECTION.DOWN : DIRECTION.UP;
-        if (mDirection == DIRECTION.UP) {
-            scrollOrigin();
-        }
-        return !canChildScrollUp();
+    public boolean onNestedPreFling(@NonNull View target, float velocityX, float velocityY) {
+        return getScrollY() <= 0 && !canChildScrollUp(target);
     }
 
     @Override
-    public boolean onNestedFling(View target, float velocityX, float velocityY, boolean consumed) {
-        return super.onNestedFling(target, velocityX, velocityY, consumed);
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        acquireVelocityTracker(ev);
+        switch (ev.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                isTouch = true;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                mVelocityTracker.computeCurrentVelocity(1000);
+                mDirection = mVelocityTracker.getYVelocity() < 0 ? DIRECTION.UP : DIRECTION.DOWN;
+                break;
+            case MotionEvent.ACTION_UP:
+                recycleVelocityTracker();
+                isTouch = false;
+                break;
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     /**
@@ -146,17 +150,27 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
         }
     }
 
+    private void acquireVelocityTracker(final MotionEvent event) {
+        if (null == mVelocityTracker) {
+            mVelocityTracker = VelocityTracker.obtain();
+        }
+        mVelocityTracker.addMovement(event);
+    }
+
+    private void recycleVelocityTracker() {
+        if (mVelocityTracker != null) {
+            mVelocityTracker.recycle();
+            mVelocityTracker = null;
+        }
+    }
 
     /**
      * Whether child view can scroll up
      *
      * @return
      */
-    public boolean canChildScrollUp() {
-        if (mRecyclerView == null) {
-            return false;
-        }
-        return ViewCompat.canScrollVertically(mRecyclerView, -1);
+    public boolean canChildScrollUp(View view) {
+        return ViewCompat.canScrollVertically(view, -1);
     }
 
     /**
@@ -164,11 +178,11 @@ public class ParentScrollLayout extends LinearLayout implements NestedScrollingP
      *
      * @return
      */
-    public boolean canChildScrollDown() {
-        if (mRecyclerView == null) {
+   /* public boolean canChildScrollDown() {
+        if (mScrollView == null) {
             return false;
         }
-        return ViewCompat.canScrollVertically(mRecyclerView, 1);
-    }
+        return ViewCompat.canScrollVertically(mScrollView, 1);
+    }*/
 
 }
