@@ -1,10 +1,10 @@
 package com.taohuahua.nestedviewdemo.scroll;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.view.NestedScrollingParent2;
-import android.support.v4.view.NestedScrollingParentHelper;
 import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -13,12 +13,14 @@ import android.view.View;
 import android.widget.RelativeLayout;
 import android.widget.Scroller;
 
+import com.taohuahua.nestedviewdemo.R;
+
 /**
  * 从上向下滑动关闭的控件
  * <p>
- * 1.需要手动实现OnFinishListener接口来dismiss
- * 2.可以选择实现SlidingPercentageListener接口来监听View滑动的比例（0.0-1.0）,可以用来设置背景透明度等
- * 3.在子控件中包含可滑动的View(RecycleView、ListView、NestedScrollView...)
+ * 1.需要手动实现OnFinishListener{@link OnFinishListener}接口来dismiss
+ * 2.可以选择实现SlidingPercentageListener{@link SlidingPercentageListener}接口来监听View滑动的比例（0.0-1.0）,可以用来设置背景透明度等
+ * 3.可以在子控件中包含可滑动的View(RecycleView、ListView、NestedScrollView...)，需要将app:hasNested设置为true
  *
  * @author heJianfeng
  * @date 2019-10-12
@@ -29,17 +31,22 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
     private float mLastY;
     private boolean isScrolling;
     private boolean isFinish;
-    private OnFinishListener onFinishListener;
-    private SlidingPercentageListener slidingPercentageListener;
+    private boolean isNeedFling;
+    private boolean hasNested;
 
-    private NestedScrollingParentHelper parentHelper;
     private Scroller mScroller;
     private VelocityTracker mVelocityTracker;
-    private boolean isTouch;
-    private DIRECTION mDirection;
+    private DIRECTION mDirection;//手指滑动方向
 
     enum DIRECTION {
         UP, DOWN
+    }
+
+    private OnFinishListener onFinishListener;
+    private SlidingPercentageListener slidingPercentageListener;
+
+    public TopToBottomFinishLayout(Context context) {
+        this(context, null);
     }
 
     public TopToBottomFinishLayout(Context context, AttributeSet attrs) {
@@ -48,7 +55,11 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
 
     public TopToBottomFinishLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        parentHelper = new NestedScrollingParentHelper(this);
+        TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.TopToBottomFinishLayout);
+        if (typedArray != null) {
+            hasNested = typedArray.getBoolean(R.styleable.TopToBottomFinishLayout_hasNested, false);
+            typedArray.recycle();
+        }
         mScroller = new Scroller(context);
     }
 
@@ -60,27 +71,29 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
 
     @Override
     public boolean onStartNestedScroll(@NonNull View child, @NonNull View target, int axes, int type) {
-        return (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
+        return (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0 && !isNeedFling;
     }
 
     @Override
     public void onNestedScrollAccepted(@NonNull View child, @NonNull View target, int axes, int type) {
-        parentHelper.onNestedScrollAccepted(child, target, axes, type);
     }
 
     @Override
     public void onStopNestedScroll(@NonNull View target, int type) {
-        parentHelper.onStopNestedScroll(target, type);
+        isNeedFling = false;
         scrollStop();
     }
 
     @Override
     public void onNestedPreScroll(@NonNull View target, int dx, int dy, @Nullable int[] consumed, int type) {
+        // 向下滑 || 向上滑
         if (notChildScrollUp(target) || (dy > 0 && getScrollY() < 0)) {
-            if (dy > 0 && (getScrollY() + dy) > 0) {
+            //避免向上滑动的时候getScrollY大于0
+            if (getScrollY() + dy > 0) {
                 dy = Math.abs(getScrollY());
             }
             if (consumed != null) {
+                //父控件消耗全部dy
                 consumed[1] += dy;
                 startScroll(dy);
             }
@@ -93,6 +106,7 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
 
     @Override
     public boolean onNestedPreFling(@NonNull View target, float velocityX, float velocityY) {
+        isNeedFling = true;
         return notChildScrollUp(target);
     }
 
@@ -100,18 +114,31 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
     public boolean dispatchTouchEvent(MotionEvent ev) {
         acquireVelocityTracker(ev);
         switch (ev.getAction()) {
-            case MotionEvent.ACTION_DOWN:
-                isTouch = true;
             case MotionEvent.ACTION_MOVE:
                 mVelocityTracker.computeCurrentVelocity(1000);
                 mDirection = mVelocityTracker.getYVelocity() < 0 ? DIRECTION.UP : DIRECTION.DOWN;
                 break;
             case MotionEvent.ACTION_UP:
-                isTouch = false;
                 recycleVelocityTracker();
                 break;
         }
         return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        float y = ev.getY();
+        switch (ev.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                mLastY = y;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (!hasNested && slideValidity(mLastY - y)) {
+                    return true;
+                }
+                break;
+        }
+        return super.onInterceptTouchEvent(ev);
     }
 
     @Override
@@ -128,15 +155,15 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
                     isScrolling = true;
                 }
                 if (isScrolling && (mDirection == DIRECTION.DOWN || getScrollY() < 0)) {
-                    //向下滚动的距离超过view的高度时，直接调用onFinish1
+                    //向下滚动的距离超过View的高度时，直接调用onFinish
                     if (Math.abs(getScrollY()) >= mViewHeight) {
                         if (onFinishListener != null) {
                             onFinishListener.onFinish();
                             return true;
                         }
                     }
-                    //防止View向上滚动
-                    if (mDirection == DIRECTION.UP && getScrollY() + dy > 0) {
+                    //避免向上滑动的时候getScrollY大于0
+                    if (getScrollY() + dy > 0) {
                         dy = Math.abs(getScrollY());
                     }
                     startScroll((int) dy);
@@ -196,8 +223,8 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
                 if (onFinishListener != null) {
                     onFinishListener.onFinish();
                 } else {
-                    scrollOrigin();
                     isFinish = false;
+                    scrollOrigin();
                 }
             }
         }
@@ -221,6 +248,12 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
         }
     }
 
+    /**
+     * 判断View能否向上滑动
+     *
+     * @param view
+     * @return true 滑动到顶了，View不能继续向上滑动了
+     */
     public boolean notChildScrollUp(View view) {
         return !ViewCompat.canScrollVertically(view, -1);
     }
