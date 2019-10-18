@@ -1,7 +1,6 @@
 package com.taohuahua.nestedviewdemo.scroll;
 
 import android.content.Context;
-import android.content.res.TypedArray;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.view.NestedScrollingParent2;
@@ -13,14 +12,12 @@ import android.view.View;
 import android.widget.RelativeLayout;
 import android.widget.Scroller;
 
-import com.taohuahua.nestedviewdemo.R;
-
 /**
  * 从上向下滑动关闭的控件
  * <p>
  * 1.需要手动实现OnFinishListener{@link OnFinishListener}接口来dismiss
  * 2.可以选择实现SlidingPercentageListener{@link SlidingPercentageListener}接口来监听View滑动的比例（0.0-1.0）,可以用来设置背景透明度等
- * 3.可以在子控件中包含可滑动的View(RecycleView、ListView、NestedScrollView...)，需要将app:hasNested设置为true
+ * 3.可以在子控件中包含可滑动的View(RecycleVie、NestedScrollView)
  *
  * @author heJianfeng
  * @date 2019-10-12
@@ -31,7 +28,6 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
     private float mLastY;
     private boolean isScrolling;
     private boolean isFinish;
-    private boolean isNeedFling;
     private boolean hasNested;
 
     private Scroller mScroller;
@@ -55,11 +51,6 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
 
     public TopToBottomFinishLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.TopToBottomFinishLayout);
-        if (typedArray != null) {
-            hasNested = typedArray.getBoolean(R.styleable.TopToBottomFinishLayout_hasNested, false);
-            typedArray.recycle();
-        }
         mScroller = new Scroller(context);
     }
 
@@ -71,7 +62,9 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
 
     @Override
     public boolean onStartNestedScroll(@NonNull View child, @NonNull View target, int axes, int type) {
-        return (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0 && !isNeedFling;
+        hasNested = true;
+        //不处理传上来的fling事件
+        return (axes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0 && type != ViewCompat.TYPE_NON_TOUCH;
     }
 
     @Override
@@ -80,7 +73,6 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
 
     @Override
     public void onStopNestedScroll(@NonNull View target, int type) {
-        isNeedFling = false;
         scrollStop();
     }
 
@@ -106,7 +98,6 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
 
     @Override
     public boolean onNestedPreFling(@NonNull View target, float velocityX, float velocityY) {
-        isNeedFling = true;
         return notChildScrollUp(target);
     }
 

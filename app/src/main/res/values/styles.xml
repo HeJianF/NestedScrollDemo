@@ -27,8 +27,4 @@
         <item name="android:windowIsTranslucent">true</item>
     </style>
 
-    <declare-styleable name="TopToBottomFinishLayout">
-        <attr name="hasNested" format="boolean" />
-    </declare-styleable>
-
 </resources>
