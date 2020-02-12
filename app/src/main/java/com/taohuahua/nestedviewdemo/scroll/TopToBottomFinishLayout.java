@@ -1,16 +1,17 @@
 package com.taohuahua.nestedviewdemo.scroll;
 
 import android.content.Context;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.core.view.NestedScrollingParent2;
-import androidx.core.view.ViewCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.widget.RelativeLayout;
 import android.widget.Scroller;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.view.NestedScrollingParent2;
+import androidx.core.view.ViewCompat;
 
 /**
  * 从上向下滑动关闭的控件
@@ -245,8 +246,8 @@ public class TopToBottomFinishLayout extends RelativeLayout implements NestedScr
      * @param view
      * @return true 滑动到顶了，View不能继续向上滑动了
      */
-    public boolean notChildScrollUp(View view) {
-        return !ViewCompat.canScrollVertically(view, -1);
+    private boolean notChildScrollUp(View view) {
+        return !view.canScrollVertically(-1);
     }
 
     /**
